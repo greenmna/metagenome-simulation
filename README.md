@@ -1,2 +1,2 @@
 # metagenome-simulation
-Scripts, including main script and scripts with functions, necessary to simulate both Nanopore and Illumina Sequence Data
+Python scripts written to enable users to generate metagenomic sequence data simulating both Illumina and Nanopore sequencing
