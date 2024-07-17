@@ -25,7 +25,7 @@ parser.add_argument("-us", "--unique-species", dest="unique", required=False,
 # set the type of DNA (if bacterial, assumed all are circular; otherwise, assumed linear (eukaryotes,viruses,etc.))
 # set abundance variability (even/variable)
 # set the quantity of data to generate (in gigabase-pairs)
-args = parser.parse_args("")  # The "" is temporary for Jupyter Notebook. Remove later
+args = parser.parse_args()  # The "" is temporary for Jupyter Notebook. Remove later
 ref = args.ref
 ngenomes = args.ngenomes
 nsamples = args.nsamples
@@ -69,7 +69,9 @@ def strain_exclusive(metagenome):
 def main():
     parent_dir = os.path.abspath('./')  # Declare parent directory
     for i in range(0, nmetagenomes + 1):
-        os.mkdir(f"metagenome_{nmetagenomes}")  # Create the directory for a simulated metagenome
+        if not os.path.isdir(f"metagenome_{nmetagenomes}"):
+            os.mkdir(f"metagenome_{nmetagenomes}")  # Create the directory for a simulated metagenome
+        
         os.chdir(f"metagenome_{nmetagenomes}")  # Change to that directory
 
 if __name__ == '__main__':
