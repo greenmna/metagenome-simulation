@@ -71,4 +71,6 @@ def main():
     for i in range(0, nmetagenomes + 1):
         os.mkdir(f"metagenome_{nmetagenomes}")  # Create the directory for a simulated metagenome
         os.chdir(f"metagenome_{nmetagenomes}")  # Change to that directory
-        
+
+if __name__ == '__main__':
+    main()
