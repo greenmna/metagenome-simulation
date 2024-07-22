@@ -44,7 +44,11 @@ nmetagenomes=args.nmetagenomes
 conda_env = args.conda_env
 
 parent_dir = os.path.abspath('./')  # Parent Directory
-ref_path = os.path.abspath(ref)  # Must be in the Parent Directory
+
+if not ref:
+    os.path.join(parent_dir, "example_files", "bacteria_refseq_catalog.tsv")
+else:
+    ref_path = os.path.abspath(ref)  # Must be in the Parent Directory
 
 # Create DataFrame from --reference-file input
 reference = pd.read_csv(ref_path, sep='\t')
