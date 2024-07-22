@@ -9,7 +9,6 @@ import pathlib
 import subprocess
 import shutil
 import zipfile
-import sys
 
 # Silence warnings about chain assignment from Pandas
 pd.options.mode.chained_assignment = None
@@ -73,26 +72,25 @@ def strain_exclusive(metagenome):
     # Attempt to add in a new organism from temp_metagenome
     
     # Check if entries are unique, and repeat steps 1-3 until all genus-species are unique
-    max_attempts = 1000000
+    max_attempts = 1000
     attempts = 0
     while metagenome.duplicated(subset=["genus-species"]).any() and attempts < max_attempts:
-        tmp_df = metagenome.drop_duplicates(subset=["genus-species"])
-        num_organisms_to_replace = ngenomes - len(tmp_df)
+        metagenome.drop_duplicates(subset=["genus-species"], inplace=True)
+        num_organisms_to_replace = ngenomes - len(metagenome)
         if num_organisms_to_replace <= 0:
             break
         
         new_entries = reference.sample(n=num_organisms_to_replace)
         
-        metagenome = pd.concat([tmp_df, new_entries])  # Replace temp_report with ref from args.ref
+        metagenome = pd.concat([metagenome, new_entries])  # Replace temp_report with ref from args.ref
         attempts += 1
     
-    if attempts == max_attempts and metagenome['genus-species'].duplicated().any():
+    if metagenome['genus-species'].duplicated().any() and attempts == max_attempts:
         print("Generation of a metagenome with unique species is not possible. "
               "Please check your reference file for a sufficient number of unique species "
               "or decrease the number of genomes used in your simulated metagenome(s)")
         return None  # In the main script, if strain_exclusive is None, then exit the code
-    
-    print(attempts)    
+        
     return metagenome
 
 
