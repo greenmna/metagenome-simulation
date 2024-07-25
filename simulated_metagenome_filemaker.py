@@ -18,7 +18,13 @@ parser = ap.ArgumentParser(description="""Generate files needed for simulation o
                            formatter_class=ap.RawTextHelpFormatter)
 # Arguments
 parser.add_argument("-rf", "--reference-file", dest="ref", type=str, required=False, help="PATH to NCBI Dataset reference file. "
-                    "This should be in the main directory where all simulated metagenomes will exist.")
+                    "This should be in the main directory where all simulated metagenomes will exist")
+group = parser.add_mutually_exclusive_group(required=True)
+group.add_argument("-tf", "--taxa-file", dest="taxa_file", action="store_true", 
+                    help="If provided, the Organism Taxonomic ID column is used to download taxonomic information. "
+                    "This argument is necessary if the user has organisms with linear and circular DNA in their reference file")
+group.add_argument("-dt", "--dna_type", dest="dna_type", type=str, help="Declare the DNA shape (linear, circular) for organisms. If using this option, "
+                   "all organisms must have the same DNA shape since it will be used for all organisms")
 parser.add_argument("-ng", "--metagenome-size", dest="ngenomes", required=False, 
                     default=10, type=int, help="Number of genomes to have within a metagenome. Must be an integer greater than 1. (default: 10)")
 parser.add_argument("-ns", "--sample-number", dest="nsamples", required=False, 
@@ -37,6 +43,8 @@ parser.add_argument("-ce", "--conda-environment", dest="conda_env", required=Fal
 # set the quantity of data to generate (in gigabase-pairs)
 args = parser.parse_args()  # The "" is temporary for Jupyter Notebook. Remove later
 ref = args.ref
+taxa_file = args.taxa_file
+dna_type = args.dna_type
 ngenomes = args.ngenomes
 nsamples = args.nsamples
 unique = args.unique
@@ -56,6 +64,17 @@ translation_table = dict.fromkeys(map(ord, "']["), None)
 reference["Organism Name"] = reference["Organism Name"].apply(lambda x: x.translate(translation_table))
 reference.rename(columns={"Assembly BioSample Strain ":"Assembly BioSample Strain"}, inplace=True)  # Should be fixed by NCBI...
 reference['genus-species'] = reference['Organism Name'].apply(lambda x: ' '.join(x.split(' ')[0:2]))  # Create genus-species column
+
+# Download NCBI taxonomy report if -tf provided
+if taxa_file:
+    taxa_to_download = ",".join([t.astype(str) for t in list(reference["Organism Taxonomic ID"].unique())])
+    download_taxon_info = f"conda run -n {conda_env} datasets summary taxonomy taxon {taxa_to_download} --as-json-lines | " \
+                          f"dataformat tsv taxonomy --template tax-summary > {parent_dir}/reference_file_taxa_report.tsv"
+    subprocess.run(download_taxon_info, shell=True)
+    # Add taxonomic information to reference file
+    taxa_report = pd.read_csv(f"{parent_dir}/reference_file_taxa_report.tsv", sep="\t")
+    reference = pd.merge(reference, taxa_report, left_on=["Organism Taxonomic ID"], right_on=["Query"])
+    reference.drop(["Query", "Taxid"], axis=1, inplace=True)  # Unnecessary
 
 # Functions
 def strain_exclusive(metagenome):
@@ -78,7 +97,7 @@ def strain_exclusive(metagenome):
     # Check if entries are unique, and repeat steps 1-3 until all genus-species are unique
     max_attempts = 1000
     attempts = 0
-    while metagenome.duplicated(subset=["genus-species"]).any() and attempts < max_attempts:
+    while metagenome.duplicated(subset=["genus-species"]).any() and attempts < max_attempts and len(metagenome < ngenomes):
         metagenome.drop_duplicates(subset=["genus-species"], inplace=True)
         num_organisms_to_replace = ngenomes - len(metagenome)
         if num_organisms_to_replace <= 0:
@@ -119,6 +138,8 @@ def extract_genomes(metagenome_dir):
         # Make clean directory
         shutil.rmtree(f"metagenome_{nmetagenomes}_genomes")  
         os.mkdir(f"metagenome_{nmetagenomes}_genomes")
+    else:
+        os.mkdir(f"metagenome_{nmetagenomes}_genomes")
     
     # Unzip and delete zipped ncbi_datasets
     with zipfile.ZipFile(f"{metagenome_dir}/ncbi_dataset.zip", 'r') as genome_zip:
@@ -127,7 +148,7 @@ def extract_genomes(metagenome_dir):
     genome_dirs = [str(d) for d in pathlib.Path(f"{metagenome_dir}/genome_data/ncbi_dataset/data").iterdir() if d.is_dir()]
     genome_files = [str(next(pathlib.Path(d).glob('*'))) for d in genome_dirs]
     for file in genome_files:
-        shutil.move(file, f"metagenome_{nmetagenomes}_genomes")
+        shutil.copy(file, f"metagenome_{nmetagenomes}_genomes")
     
     # Remove intermediary folder(s)
     shutil.rmtree(f"{metagenome_dir}/genome_data")
@@ -136,13 +157,17 @@ def extract_genomes(metagenome_dir):
 
 
 def create_genome_list(sim_metagenome_df, genome_location):
-    genome_paths = [os.path.abspath(filepath) for filepath in os.listdir(genome_location)]
+    genome_paths = [os.path.abspath(os.path.join(genome_location, filepath)) for filepath in os.listdir(genome_location)]
     tmp_genome_list = sim_metagenome_df[['Organism Name']]
     tmp_genome_list['genome_path'] = genome_paths
     return tmp_genome_list
 
 def create_dna_list(sim_metagenome_df):
-    tmp_dna_list = sim_metagenome_df[['Organism Name', 'Assembly Stats Number of Contigs']]
+    if taxa_file:
+        tmp_dna_list = sim_metagenome_df[['Organism Name', 'Assembly Stats Number of Contigs', 'Superkingdom name']]
+    else:
+        tmp_dna_list = sim_metagenome_df[['Organism Name', 'Assembly Stats Number of Contigs']]
+
     tmp_dna_list = tmp_dna_list.loc[np.repeat(tmp_dna_list.index.values, tmp_dna_list['Assembly Stats Number of Contigs'])].reset_index(drop=True)
     counter = {}
     tmp_dna_list['DNA molecules'] = ''
@@ -155,7 +180,11 @@ def create_dna_list(sim_metagenome_df):
             counter[organism] += 1
         tmp_dna_list.at[index, 'DNA molecules'] = f'{organism}_dna_molecule_{counter[organism]}'
     
-    tmp_dna_list.drop('Assembly Stats Number of Contigs', axis=1, inplace=True)
+    if taxa_file:
+        tmp_dna_list['DNA molecule type'] = tmp_dna_list['Superkingdom name'].apply(lambda x: "circluar" if x=="Bacteria" else "linear")  # Not perfect...
+    else:
+        tmp_dna_list['DNA molecule type'] = "circular" if dna_type == "circular" else "linear"
+    tmp_dna_list.drop(['Assembly Stats Number of Contigs', 'Superkingdom name'], axis=1, inplace=True)
     return tmp_dna_list
 
 # Main
