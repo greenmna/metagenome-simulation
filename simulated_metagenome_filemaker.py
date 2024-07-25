@@ -19,12 +19,6 @@ parser = ap.ArgumentParser(description="""Generate files needed for simulation o
 # Arguments
 parser.add_argument("-rf", "--reference-file", dest="ref", type=str, required=False, help="PATH to NCBI Dataset reference file. "
                     "This should be in the main directory where all simulated metagenomes will exist")
-group = parser.add_mutually_exclusive_group(required=True)
-group.add_argument("-tf", "--taxa-file", dest="taxa_file", action="store_true", 
-                    help="If provided, the Organism Taxonomic ID column is used to download taxonomic information. "
-                    "This argument is necessary if the user has organisms with linear and circular DNA in their reference file")
-group.add_argument("-dt", "--dna_type", dest="dna_type", type=str, help="Declare the DNA shape (linear, circular) for organisms. If using this option, "
-                   "all organisms must have the same DNA shape since it will be used for all organisms")
 parser.add_argument("-ng", "--metagenome-size", dest="ngenomes", required=False, 
                     default=10, type=int, help="Number of genomes to have within a metagenome. Must be an integer greater than 1. (default: 10)")
 parser.add_argument("-ns", "--sample-number", dest="nsamples", required=False, 
@@ -43,8 +37,6 @@ parser.add_argument("-ce", "--conda-environment", dest="conda_env", required=Fal
 # set the quantity of data to generate (in gigabase-pairs)
 args = parser.parse_args()  # The "" is temporary for Jupyter Notebook. Remove later
 ref = args.ref
-taxa_file = args.taxa_file
-dna_type = args.dna_type
 ngenomes = args.ngenomes
 nsamples = args.nsamples
 unique = args.unique
@@ -64,17 +56,6 @@ translation_table = dict.fromkeys(map(ord, "']["), None)
 reference["Organism Name"] = reference["Organism Name"].apply(lambda x: x.translate(translation_table))
 reference.rename(columns={"Assembly BioSample Strain ":"Assembly BioSample Strain"}, inplace=True)  # Should be fixed by NCBI...
 reference['genus-species'] = reference['Organism Name'].apply(lambda x: ' '.join(x.split(' ')[0:2]))  # Create genus-species column
-
-# Download NCBI taxonomy report if -tf provided
-if taxa_file:
-    taxa_to_download = ",".join([t.astype(str) for t in list(reference["Organism Taxonomic ID"].unique())])
-    download_taxon_info = f"conda run -n {conda_env} datasets summary taxonomy taxon {taxa_to_download} --as-json-lines | " \
-                          f"dataformat tsv taxonomy --template tax-summary > {parent_dir}/reference_file_taxa_report.tsv"
-    subprocess.run(download_taxon_info, shell=True)
-    # Add taxonomic information to reference file
-    taxa_report = pd.read_csv(f"{parent_dir}/reference_file_taxa_report.tsv", sep="\t")
-    reference = pd.merge(reference, taxa_report, left_on=["Organism Taxonomic ID"], right_on=["Query"])
-    reference.drop(["Query", "Taxid"], axis=1, inplace=True)  # Unnecessary
 
 # Functions
 def strain_exclusive(metagenome):
@@ -163,10 +144,24 @@ def create_genome_list(sim_metagenome_df, genome_location):
     return tmp_genome_list
 
 def create_dna_list(sim_metagenome_df):
-    if taxa_file:
-        tmp_dna_list = sim_metagenome_df[['Organism Name', 'Assembly Stats Number of Contigs', 'Superkingdom name']]
-    else:
-        tmp_dna_list = sim_metagenome_df[['Organism Name', 'Assembly Stats Number of Contigs']]
+    # Gather taxonomic information
+    taxa_to_download = ",".join([t.astype(str) for t in list(sim_metagenome_df["Organism Taxonomic ID"].unique())])
+    download_taxa_info = f"conda run -n {conda_env} datasets summary taxonomy taxon {taxa_to_download} --as-json-lines > " \
+                         f"tmp_taxa_info.jsonl"
+    subprocess.run(download_taxa_info, shell=True)
+    jsonl_file = os.path.join(os.path.abspath("./"), "tmp_taxa_info.jsonl")
+    
+    # Current issues with dataformat make it fail to recogniez .jsonl files despite being able to as indicated on their documentation
+    # Errors can be ignored if claiming format issues with input file (conda will also kick an error, but code will proceed without issue)
+    format_taxa_info = f"dataformat tsv taxonomy --infile {jsonl_file} --template tax-summary > " \
+                       f"{parent_dir}/metagenome_{nmetagenomes}/metagenome_{nmetagenomes}_taxa_report.tsv"
+    subprocess.run(format_taxa_info, shell=True)
+    
+    # Add taxonomic information to reference file
+    taxa_report = pd.read_csv(f"{parent_dir}/metagenome_{nmetagenomes}/metagenome_{nmetagenomes}_taxa_report.tsv", sep="\t")
+    
+    tmp_dna_list = pd.merge(sim_metagenome_df, taxa_report, left_on=["Organism Taxonomic ID"], right_on=["Query"])   
+    tmp_dna_list = tmp_dna_list[['Organism Name', 'Assembly Stats Number of Contigs', 'Superkingdom name']]
 
     tmp_dna_list = tmp_dna_list.loc[np.repeat(tmp_dna_list.index.values, tmp_dna_list['Assembly Stats Number of Contigs'])].reset_index(drop=True)
     counter = {}
@@ -179,12 +174,10 @@ def create_dna_list(sim_metagenome_df):
         else:
             counter[organism] += 1
         tmp_dna_list.at[index, 'DNA molecules'] = f'{organism}_dna_molecule_{counter[organism]}'
-    
-    if taxa_file:
-        tmp_dna_list['DNA molecule type'] = tmp_dna_list['Superkingdom name'].apply(lambda x: "circluar" if x=="Bacteria" else "linear")  # Not perfect...
-    else:
-        tmp_dna_list['DNA molecule type'] = "circular" if dna_type == "circular" else "linear"
+
+    tmp_dna_list['DNA molecule type'] = tmp_dna_list['Superkingdom name'].apply(lambda x: "circluar" if x=="Bacteria" else "linear")  # Not perfect...
     tmp_dna_list.drop(['Assembly Stats Number of Contigs', 'Superkingdom name'], axis=1, inplace=True)
+    
     return tmp_dna_list
 
 # Main
