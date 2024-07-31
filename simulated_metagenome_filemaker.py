@@ -19,7 +19,7 @@ pd.options.mode.chained_assignment = None
 parser = ap.ArgumentParser(description="""Generate files needed for simulation of short- and/or long-read metagenomic sequence data.""", 
                            formatter_class=ap.RawTextHelpFormatter)
 # Arguments
-parser.add_argument("-rf", "--reference-file", dest="ref", type=str, required=False, help="PATH to NCBI Dataset reference file. "
+parser.add_argument("-rf", "--reference-file", dest="ref", type=str, required=True, help="PATH to NCBI Dataset reference file. "
                     "Preferably, this is in the directory where simulated metagenomes are created.")
 parser.add_argument("-ng", "--metagenome-size", dest="ngenomes", required=False, 
                     default=10, type=int, help="Number of genomes to have within a metagenome. Must be an integer greater than 1. (default: 10)")
