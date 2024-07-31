@@ -20,7 +20,7 @@ parser = ap.ArgumentParser(description="""Generate files needed for simulation o
                            formatter_class=ap.RawTextHelpFormatter)
 # Arguments
 parser.add_argument("-rf", "--reference-file", dest="ref", type=str, required=False, help="PATH to NCBI Dataset reference file. "
-                    "This should be in the main directory where all simulated metagenomes will exist")
+                    "Preferably, this is in the directory where simulated metagenomes are created.")
 parser.add_argument("-ng", "--metagenome-size", dest="ngenomes", required=False, 
                     default=10, type=int, help="Number of genomes to have within a metagenome. Must be an integer greater than 1. (default: 10)")
 parser.add_argument("-ns", "--sample-number", dest="nsamples", required=False, 
@@ -28,9 +28,9 @@ parser.add_argument("-ns", "--sample-number", dest="nsamples", required=False,
 parser.add_argument("-nm", "--number-metagenomes", dest="nmetagenomes", required=False, 
                     default=1, type=int, help="Number of metagenomes to simulate. Must be an integer of at least 1 (default: 1)")
 parser.add_argument("-us", "--unique-species", dest="unique", required=False, action='store_true', 
-                    help='Limits metagenomes to one instance of each species. If not possible (reference file is too limited), ' 
-                    'the warning "Generation of a metagenome with unique species is not possible. Please check your reference file for "'
-                    'sufficient, unique species or decrease the number of genomes used in your simulated metagenome(s)')
+                    help='Limits metagenomes to one instance of each species.\n' \
+                    'If not possible, the warning "Generation of a metagenome with unique species is not possible.\n' \
+                    'Please check your reference file for a sufficient number of unique species or decrease the number of genomes used."')
 parser.add_argument("-ce", "--conda-environment", dest="conda_env", required=False, 
                     type=str, default="ncbi_datasets", 
                     help="Specify the conda environment that ncbi_datasets_cli is accessed in. (default: ncbi_datasets)")
