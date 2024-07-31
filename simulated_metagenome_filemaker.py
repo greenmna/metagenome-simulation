@@ -35,7 +35,7 @@ parser.add_argument("-ce", "--conda-environment", dest="conda_env", required=Fal
                     type=str, default="ncbi_datasets", 
                     help="Specify the conda environment that ncbi_datasets_cli is accessed in. (default: ncbi_datasets)")
 parser.add_argument("-av", "--abundance-variation", dest="vary_abundance", required=False, 
-                    type=str, choices={"even", "random"}, default="real", 
+                    type=str, choices={"even", "random"}, default="random", 
                     help="Describes how abundances for organisms in a metagenome will be distributed.\n" \
                         "even: all organisms have the same number of reads\n" \
                         "random: abundance values are assigned at random\n" \
@@ -207,7 +207,7 @@ def create_abundance_list(sim_metagenome_df):
             abund[i] = random.choices(range(1, read_count), k=ngenomes)
         abund = abund.apply(lambda x: (x / x.sum()) * 100 if x.dtype == "int64" else x)
     else:
-        print('An improper string was given for the vary_abundance argument. Please specify either "even", "random", or "real"')
+        print('An improper string was given for the vary_abundance argument. Please specify either "even" or "random"')
         sys.exit()
         
     abund.rename(columns=dict([x, read_count] for x in range(0, nsamples)), inplace=True)
