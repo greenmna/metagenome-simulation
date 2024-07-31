@@ -9,6 +9,8 @@ import pathlib
 import subprocess
 import shutil
 import zipfile
+import random
+import sys
 
 # Silence warnings about chain assignment from Pandas
 pd.options.mode.chained_assignment = None
@@ -32,6 +34,14 @@ parser.add_argument("-us", "--unique-species", dest="unique", required=False, ac
 parser.add_argument("-ce", "--conda-environment", dest="conda_env", required=False, 
                     type=str, default="ncbi_datasets", 
                     help="Specify the conda environment that ncbi_datasets_cli is accessed in. (default: ncbi_datasets)")
+parser.add_argument("-av", "--abundance-variation", dest="vary_abundance", required=False, 
+                    type=str, choices={"even", "random"}, default="real", 
+                    help="Describes how abundances for organisms in a metagenome will be distributed.\n" \
+                        "even: all organisms have the same number of reads\n" \
+                        "random: abundance values are assigned at random\n" \
+                        "(default: random)")
+parser.add_argument("-rc", "--read-count", dest="read_count", required=False, default=650_000, type=int, 
+                    help="Specify how many reads will be simulated (default: 650_000)")
 # set the type of DNA (if bacterial, assumed all are circular; otherwise, assumed linear (eukaryotes,viruses,etc.))
 # set abundance variability (even/variable)
 # set the quantity of data to generate (in gigabase-pairs)
@@ -42,6 +52,8 @@ nsamples = args.nsamples
 unique = args.unique
 nmetagenomes=args.nmetagenomes
 conda_env = args.conda_env
+vary_abundance = args.vary_abundance
+read_count = args.read_count
 
 parent_dir = os.path.abspath('./')  # Parent Directory
 
@@ -78,7 +90,7 @@ def strain_exclusive(metagenome):
     # Check if entries are unique, and repeat steps 1-3 until all genus-species are unique
     max_attempts = 1000
     attempts = 0
-    while metagenome.duplicated(subset=["genus-species"]).any() and attempts < max_attempts and len(metagenome < ngenomes):
+    while metagenome.duplicated(subset=["genus-species"]).any() and attempts < max_attempts and len(metagenome) < ngenomes:
         metagenome.drop_duplicates(subset=["genus-species"], inplace=True)
         num_organisms_to_replace = ngenomes - len(metagenome)
         if num_organisms_to_replace <= 0:
@@ -105,13 +117,11 @@ def download_genomes(ref_df):
         accessions = ','.join(list(set(list(synth_metagenome["Assembly Accession"]))))
         download_command = f"conda run -n {conda_env} datasets download genome accession {accessions} --assembly-level complete --assembly-source RefSeq --exclude-atypical"
         subprocess.run(download_command, shell=True)
-    
     else:
         accessions = ','.join(list(set(list(synth_metagenome["Assembly Accession"]))))
         download_command = f"conda run -n {conda_env} datasets download genome accession {accessions} --assembly-level complete --assembly-source RefSeq --exclude-atypical"
         subprocess.run(download_command, shell=True)
     
-    synth_metagenome['parse'] = synth_metagenome['genus-species'].apply(lambda x: x.split(' '))
     return synth_metagenome
 
 def extract_genomes(metagenome_dir):
@@ -153,9 +163,9 @@ def create_dna_list(sim_metagenome_df):
     
     # Current issues with dataformat make it fail to recogniez .jsonl files despite being able to as indicated on their documentation
     # Errors can be ignored if claiming format issues with input file (conda will also kick an error, but code will proceed without issue)
-    format_taxa_info = f"dataformat tsv taxonomy --infile {jsonl_file} --template tax-summary > " \
+    format_taxa_info = f"conda run -n {conda_env} dataformat tsv taxonomy --inputfile {jsonl_file} --template tax-summary > " \
                        f"{parent_dir}/metagenome_{nmetagenomes}/metagenome_{nmetagenomes}_taxa_report.tsv"
-    subprocess.run(format_taxa_info, shell=True)
+    subprocess.run(format_taxa_info, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
     
     # Add taxonomic information to reference file
     taxa_report = pd.read_csv(f"{parent_dir}/metagenome_{nmetagenomes}/metagenome_{nmetagenomes}_taxa_report.tsv", sep="\t")
@@ -179,6 +189,30 @@ def create_dna_list(sim_metagenome_df):
     tmp_dna_list.drop(['Assembly Stats Number of Contigs', 'Superkingdom name'], axis=1, inplace=True)
     
     return tmp_dna_list
+
+def create_abundance_list(sim_metagenome_df):
+    # Col 1 is called "Size"
+    # Col 2 - Col n is the number of reads to simulate (default 650_000)
+    # NanoSim uses percentages, where BBMap uses whole numbers of reads
+    # Given this, we need to adjust the percentages such that whole number are providable for BBMap automatically  
+    cols = ["Size"]
+    [cols.append(x) for x in range(0, nsamples)]
+    abund = pd.DataFrame(columns=cols, dtype=str)
+    abund["Size"] = sim_metagenome_df['Organism Name']
+    
+    if vary_abundance == "even":
+        abund[cols[1:]] = 100 / len(abund.Size)
+    elif vary_abundance == "random":
+        for i in range(0, len(abund.columns) - 1):
+            abund[i] = random.choices(range(1, read_count), k=ngenomes)
+        abund = abund.apply(lambda x: (x / x.sum()) * 100 if x.dtype == "int64" else x)
+    else:
+        print('An improper string was given for the vary_abundance argument. Please specify either "even", "random", or "real"')
+        sys.exit()
+        
+    abund.rename(columns=dict([x, read_count] for x in range(0, nsamples)), inplace=True)
+    return abund
+
 
 # Main
 
@@ -204,6 +238,9 @@ def main():
         # Generate DNA_list
         dna_list = create_dna_list(sim_metagenome)
         dna_list.to_csv(f"{working_dir}/metagenome_{nmetagenomes}_dna_list.tsv", sep="\t", header=None, index=False)
+        # Generate abudance_list
+        abundance_list = create_abundance_list(sim_metagenome)
+        abundance_list.to_csv(f"{working_dir}/metagenome_{nmetagenomes}_abundance_list.tsv", sep="\t", index=False)
         
         os.chdir(parent_dir)
 
