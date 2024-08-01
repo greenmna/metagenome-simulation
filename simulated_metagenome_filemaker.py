@@ -153,7 +153,7 @@ def create_genome_list(sim_metagenome_df, genome_location):
     tmp_genome_list['genome_path'] = genome_paths
     return tmp_genome_list
 
-def create_dna_list(sim_metagenome_df):
+def create_dna_list(sim_metagenome_df, current_metagenome):
     # Gather taxonomic information
     taxa_to_download = ",".join([t.astype(str) for t in list(sim_metagenome_df["Organism Taxonomic ID"].unique())])
     download_taxa_info = f"conda run -n {conda_env} datasets summary taxonomy taxon {taxa_to_download} --as-json-lines > " \
@@ -168,7 +168,7 @@ def create_dna_list(sim_metagenome_df):
     subprocess.run(format_taxa_info, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
     
     # Add taxonomic information to reference file
-    taxa_report = pd.read_csv(f"{parent_dir}/metagenome_{nmetagenomes}/metagenome_{nmetagenomes}_taxa_report.tsv", sep="\t")
+    taxa_report = pd.read_csv(f"{parent_dir}/metagenome_{current_metagenome}/metagenome_{current_metagenome}_taxa_report.tsv", sep="\t")
     
     tmp_dna_list = pd.merge(sim_metagenome_df, taxa_report, left_on=["Organism Taxonomic ID"], right_on=["Query"])   
     tmp_dna_list = tmp_dna_list[['Organism Name', 'Assembly Stats Number of Contigs', 'Superkingdom name']]
@@ -236,7 +236,7 @@ def main():
         genome_list = create_genome_list(sim_metagenome, genome_dir)
         genome_list.to_csv(f"{working_dir}/metagenome_{i}_genome_list.tsv", sep="\t", header=None, index=False)
         # Generate DNA_list
-        dna_list = create_dna_list(sim_metagenome)
+        dna_list = create_dna_list(sim_metagenome, i)
         dna_list.to_csv(f"{working_dir}/metagenome_{i}_dna_list.tsv", sep="\t", header=None, index=False)
         # Generate abudance_list
         abundance_list = create_abundance_list(sim_metagenome)
