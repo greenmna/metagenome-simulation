@@ -124,13 +124,13 @@ def download_genomes(ref_df):
     
     return synth_metagenome
 
-def extract_genomes(metagenome_dir):
-    if os.path.isdir(f"metagenome_{nmetagenomes}_genomes"):
+def extract_genomes(metagenome_dir, current_metagenome):
+    if os.path.isdir(f"metagenome_{current_metagenome}_genomes"):
         # Make clean directory
-        shutil.rmtree(f"metagenome_{nmetagenomes}_genomes")  
-        os.mkdir(f"metagenome_{nmetagenomes}_genomes")
+        shutil.rmtree(f"metagenome_{current_metagenome}_genomes")  
+        os.mkdir(f"metagenome_{current_metagenome}_genomes")
     else:
-        os.mkdir(f"metagenome_{nmetagenomes}_genomes")
+        os.mkdir(f"metagenome_{current_metagenome}_genomes")
     
     # Unzip and delete zipped ncbi_datasets
     with zipfile.ZipFile(f"{metagenome_dir}/ncbi_dataset.zip", 'r') as genome_zip:
@@ -164,7 +164,7 @@ def create_dna_list(sim_metagenome_df, current_metagenome):
     # Current issues with dataformat make it fail to recogniez .jsonl files despite being able to as indicated on their documentation
     # Errors can be ignored if claiming format issues with input file (conda will also kick an error, but code will proceed without issue)
     format_taxa_info = f"conda run -n {conda_env} dataformat tsv taxonomy --inputfile {jsonl_file} --template tax-summary > " \
-                       f"{parent_dir}/metagenome_{nmetagenomes}/metagenome_{nmetagenomes}_taxa_report.tsv"
+                       f"{parent_dir}/metagenome_{current_metagenome}/metagenome_{current_metagenome}_taxa_report.tsv"
     subprocess.run(format_taxa_info, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
     
     # Add taxonomic information to reference file
@@ -230,7 +230,7 @@ def main():
         sim_metagenome.to_csv(f"{working_dir}/metagenome_simulation_reference_file.tsv",sep="\t")
         
         # Extract downloaded information from NCBI
-        genome_dir = extract_genomes(working_dir)
+        genome_dir = extract_genomes(working_dir, i)
         
         # Generate genome_list
         genome_list = create_genome_list(sim_metagenome, genome_dir)
