@@ -217,11 +217,11 @@ def create_abundance_list(sim_metagenome_df):
 # Main
 
 def main():
-    for i in range(1, nmetagenomes + 1, 1):
-        if not os.path.isdir(f"metagenome_{nmetagenomes}"):
-            os.mkdir(f"metagenome_{nmetagenomes}")  # Create the directory for a simulated metagenome
+    for i in range(1, nmetagenomes + 1):
+        if not os.path.isdir(f"metagenome_{i}"):
+            os.mkdir(f"metagenome_{i}")  # Create the directory for a simulated metagenome
 
-        os.chdir(f"metagenome_{nmetagenomes}")
+        os.chdir(f"metagenome_{i}")
         working_dir = os.path.abspath("./")
         
         # Generate simulated metagenome metadata
@@ -234,13 +234,13 @@ def main():
         
         # Generate genome_list
         genome_list = create_genome_list(sim_metagenome, genome_dir)
-        genome_list.to_csv(f"{working_dir}/metagenome_{nmetagenomes}_genome_list.tsv", sep="\t", header=None, index=False)
+        genome_list.to_csv(f"{working_dir}/metagenome_{i}_genome_list.tsv", sep="\t", header=None, index=False)
         # Generate DNA_list
         dna_list = create_dna_list(sim_metagenome)
-        dna_list.to_csv(f"{working_dir}/metagenome_{nmetagenomes}_dna_list.tsv", sep="\t", header=None, index=False)
+        dna_list.to_csv(f"{working_dir}/metagenome_{i}_dna_list.tsv", sep="\t", header=None, index=False)
         # Generate abudance_list
         abundance_list = create_abundance_list(sim_metagenome)
-        abundance_list.to_csv(f"{working_dir}/metagenome_{nmetagenomes}_abundance_list.tsv", sep="\t", index=False)
+        abundance_list.to_csv(f"{working_dir}/metagenome_{i}_abundance_list.tsv", sep="\t", index=False)
         
         os.chdir(parent_dir)
 
