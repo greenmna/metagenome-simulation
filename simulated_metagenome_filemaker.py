@@ -139,7 +139,7 @@ def extract_genomes(metagenome_dir, current_metagenome):
     genome_dirs = [str(d) for d in pathlib.Path(f"{metagenome_dir}/genome_data/ncbi_dataset/data").iterdir() if d.is_dir()]
     genome_files = [str(next(pathlib.Path(d).glob('*'))) for d in genome_dirs]
     for file in genome_files:
-        shutil.copy(file, f"metagenome_{nmetagenomes}_genomes")
+        shutil.copy(file, f"metagenome_{current_metagenome}_genomes")
     
     # Remove intermediary folder(s)
     shutil.rmtree(f"{metagenome_dir}/genome_data")
