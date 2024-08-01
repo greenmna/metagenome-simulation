@@ -227,7 +227,7 @@ def main():
         # Generate simulated metagenome metadata
         sim_metagenome = download_genomes(reference)
         sim_metagenome.sort_values(by='Assembly Accession', inplace=True)
-        sim_metagenome.to_csv(f"{working_dir}/metagenome_simulation_reference_file.tsv",sep="\t")
+        sim_metagenome.to_csv(f"{working_dir}/metagenome_{i}_reference_file.tsv",sep="\t")
         
         # Extract downloaded information from NCBI
         genome_dir = extract_genomes(working_dir, i)
