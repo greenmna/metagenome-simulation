@@ -90,14 +90,13 @@ def strain_exclusive(metagenome):
     # Check if entries are unique, and repeat steps 1-3 until all genus-species are unique
     max_attempts = 1000
     attempts = 0
-    while metagenome.duplicated(subset=["genus-species"]).any() and attempts < max_attempts and len(metagenome) < ngenomes:
-        duplicated_species = metagenome[metagenome["genus-species"].duplicated(keep=False)]
-        metagenome = metagenome.drop(duplicated_species.index)
+    while metagenome.duplicated(subset=["genus-species"]).any() and attempts < max_attempts:
+        metagenome.drop_duplicates(subset=['genus-species'], inplace=True)
         num_organisms_to_replace = ngenomes - len(metagenome)
         if num_organisms_to_replace <= 0:
             break
         
-        new_entries = reference.sample(n=num_organisms_to_replace, replace=False)
+        new_entries = reference.sample(n=num_organisms_to_replace)
         
         metagenome = pd.concat([metagenome, new_entries])  # Replace temp_report with ref from args.ref
         attempts += 1
