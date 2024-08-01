@@ -144,7 +144,7 @@ def extract_genomes(metagenome_dir, current_metagenome):
     # Remove intermediary folder(s)
     shutil.rmtree(f"{metagenome_dir}/genome_data")
     
-    return os.path.abspath(f"metagenome_{nmetagenomes}_genomes")
+    return os.path.abspath(f"metagenome_{current_metagenome}_genomes")
 
 
 def create_genome_list(sim_metagenome_df, genome_location):
