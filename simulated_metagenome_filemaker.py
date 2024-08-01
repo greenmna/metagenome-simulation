@@ -217,7 +217,7 @@ def create_abundance_list(sim_metagenome_df):
 # Main
 
 def main():
-    for i in range(nmetagenomes):
+    for i in range(1, nmetagenomes + 1, 1):
         if not os.path.isdir(f"metagenome_{nmetagenomes}"):
             os.mkdir(f"metagenome_{nmetagenomes}")  # Create the directory for a simulated metagenome
 
